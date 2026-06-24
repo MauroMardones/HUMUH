@@ -1,7 +1,6 @@
-# HUMUH — Spatio-temporal analysis of fishing effort in the Gulf of Cádiz
+# HUMUH — Spatio-temporal analysis of fishing effort multi-fleet in the Gulf of Cádiz
 
 **Instituto Español de Oceanografía (IEO-CSIC)**  
-**Demarcación Sudatlántica — 2018–2024**
 
 ---
 
@@ -14,7 +13,6 @@ This project analyses the spatio-temporal patterns of fishing fleet activity in 
 
 The combination of both sources allows assignment of a fishing gear to each VMS ping and derivation of spatially explicit fishing effort (hours fished) at a 0.05° × 0.05° grid (~5.6 km) across the study area.
 
-The analysis covers seven gear types following ICES LE_MET4 coding: DRB (beam trawl/dredge), FPO (pots/traps), GTR (trammel net), GNS (set gillnet), LLS (bottom longline), LHP (hand line), and LTL (troll line).
 
 ---
 
