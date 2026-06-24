@@ -8,6 +8,11 @@ library(data.table)
 library(tidyverse)
 library(fst)
 
+# --- Crear carpetas si no existen --------------------------------------------
+dir.create("outputs",      showWarnings = FALSE, recursive = TRUE)
+dir.create("outputs/shp",  showWarnings = FALSE, recursive = TRUE)
+dir.create("outputs/CSV",  showWarnings = FALSE, recursive = TRUE)
+dir.create("figs",         showWarnings = FALSE, recursive = TRUE)
 # --- Zona de estudio (bounding box) ------------------------------------------
 lat_min <- 34; lat_max <- 38
 lon_min <- -8; lon_max <- -5
