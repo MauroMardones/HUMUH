@@ -1,0 +1,940 @@
+---
+title: "ISMS_2026"
+author: "Ángela Mª Márquez"
+date: "2026-05-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Cargar librerías
+
+```{r}
+library(tidyverse)   # manipulación, análisis y visualización de datos (dplyr, ggplot2, etc.)
+library(geosphere)   # cálculos geodésicos (distancias, áreas, ángulos, etc. sobre la superficie terrestre)
+library(sf)          # Manejo y análisis de datos espaciales (shapefiles, geometrías, operaciones espaciales)
+library(rstudioapi)  # Permite interactuar con RStudio (por ejemplo, obtener la ruta del script actual)
+library(lubridate)   # Facilita el trabajo con fechas y horas (creación, conversión, extracción de componentes temporales)
+library(tools)
+library(ggplot2)   # visualización
+library(rnaturalearth)       # mapas base
+library(rnaturalearthdata)   # datos de Natural Earth
+library(dplyr)
+library(ggspatial)
+library(basemaps)
+library(prettymapr)
+library(leaflet)
+library(readxl)
+library(sp)
+library(tidyr)
+
+```
+
+Tratar de correr los datos desde el 2028 al 2024, para ver si el proceso de formateo es el mismo. En caso de que no lo sea, habría que adaptar el script a cada año, o al menos a cada formato de datos.
+
+
+#Cargar datos CV y procesarlos para trabajar con ellos
+
+```{r}
+CV_2024_1 <- read.csv2("D:/HUMUH_Ecología Presiones Humanas/PESCA/DATOS/Junta Andalucía/Cajas verdes/CAJAS_NUEVAS_2017-102025_002/Resultados_EQ_SLFP_PET314554/Resultado_2_CAJAS_NUEVAS_2024.csv", sep = ";", dec = ".")
+CV_2024_2 <- read.csv2("D:/HUMUH_Ecología Presiones Humanas/PESCA/DATOS/Junta Andalucía/Cajas verdes/CAJAS_NUEVAS_2017-102025_002/Resultados_EQ_SLFP_PET314554/Resultado_2_CAJAS_NUEVAS_2024_2.csv", sep = ";", dec = ".")
+
+CV_2024_1 <- read.csv2("//tsclient/D/HUMUH_Ecología Presiones Humanas/PESCA/DATOS/Junta Andalucía/Cajas verdes/CAJAS_NUEVAS_2017-102025_002/Resultados_EQ_SLFP_PET314554/Resultado_2_CAJAS_NUEVAS_2024.csv", sep = ";", dec = ".") #ruta en escritorio remoto
+CV_2024_2 <- read.csv2("//tsclient/D/HUMUH_Ecología Presiones Humanas/PESCA/DATOS/Junta Andalucía/Cajas verdes/CAJAS_NUEVAS_2017-102025_002/Resultados_EQ_SLFP_PET314554/Resultado_2_CAJAS_NUEVAS_2024_2.csv", sep = ";", dec = ".") #ruta en escritorio remoto
+
+
+#----recortar datos ZE para reducir volumen datos---------------
+#establecer vértices del polígono de trabajo
+#lat_min <- 34
+#lat_max <- 38
+#lon_min <- -8
+#lon_max <- -5
+```
+
+Aca no es necesario recortar por zona de estudio, pero se ha hecho para reducir el volumen de datos y facilitar el trabajo. En caso de que se quiera trabajar con toda la zona, se pueden eliminar los pasos de recorte y unir directamente los datos de cajas verdes 1 y 2.
+
+```{r}
+#se ha particionado en dos la zona de estudio por volumen de datos
+lat_min <- 34
+lat_max <- 38
+lon_min <- -7
+lon_max <- -5
+
+lat_min2 <- 34
+lat_max2 <- 38
+lon_min2 <- -8
+lon_max2 <- -7
+
+#comprobar clase de los campos (deben ser numéricos para cortar por zona de estudio)
+class(CV_2024_1$LATITUD)
+class(CV_2024_2$LATITUD)
+class(CV_2024_1$LONGITUD)
+class(CV_2024_2$LONGITUD)
+
+#recortar los datos según los vértices establecidos / Debemos asegurarnos que el .csv tiene como separador decimal la coma (,) y que el separador el punto y coma (;)
+CV_2024_1_ZE_1 <- filter(CV_2024_1, LATITUD >= lat_min,
+                              LATITUD <= lat_max,
+                              LONGITUD >= lon_min,
+                              LONGITUD <= lon_max)
+CV_2024_2_ZE_1 <- filter(CV_2024_2, LATITUD >= lat_min,
+                              LATITUD <= lat_max,
+                              LONGITUD >= lon_min,
+                              LONGITUD <= lon_max)
+
+CV_2024_1_ZE_2 <- filter(CV_2024_1, LATITUD >= lat_min2,
+                              LATITUD <= lat_max2,
+                              LONGITUD >= lon_min2,
+                              LONGITUD <= lon_max2)
+CV_2024_2_ZE_2 <- filter(CV_2024_2, LATITUD >= lat_min2,
+                              LATITUD <= lat_max2,
+                              LONGITUD >= lon_min2,
+                              LONGITUD <= lon_max2)
+
+#si fuera necesario se podría establecer que la clase fuese numérica
+#CV_2024_format$SI_LATI <- as.numeric(CV_2024_format$SI_LATI) #establecer que la clase sea numérica
+#CV_2024_format$SI_LONG <- as.numeric(CV_2024_format$SI_LONG)
+#CV_2024_format$SI_SPCA <- as.numeric(CV_2024_format$SI_SPCA)
+
+#para comprobar si los límites de la zona de estudio están bien definidos
+#CV_plot <- st_as_sf(
+   #  CV_2024_ZE,
+  #  coords = c("SI_LONG", "SI_LATI"),
+   #  crs = 4326)
+  
+#ggplot(CV_plot) +
+   #  geom_sf(aes(color = SI_SPCA)) +
+  #   scale_color_viridis_c() +
+  #   theme_minimal()
+
+#unir datos de cajas verdes año 2024
+CV_2024_ZE_1 <- merge(CV_2024_1_ZE_1, CV_2024_2_ZE_1, all= T)
+CV_2024_ZE_2 <- merge(CV_2024_1_ZE_2, CV_2024_2_ZE_2, all= T)
+
+#-----------------PROCESADO DE DATOS DE CAJAS VERDES PARA TRABAJAR CON ELLOS------
+#Aquí los datos pueden ser reformateados según las indicaciones de Serna (usando su script), pueden saltarse estos pasos si el archivo ya está formateado
+
+data_1 <- unique(CV_2024_ZE_1) #eliminar duplicados
+data_2 <- unique(CV_2024_ZE_2)
+
+#Función para crear código CFR a partir del CPFO
+create_cfr <- function(CODBU) {
+  # Convertir a cadena
+  CODBU <- as.character(CODBU)
+  # Obtener la longitud del CODBU
+  longitud <- nchar(CODBU)
+  # Agregar ceros
+  ceros <- paste0(rep("0", 9 - longitud), collapse = "")
+  # Formatear el código completo
+  # collapse="" une todos los elementos de un vector en un solo texto sin separarlos.
+  # Con collapse="", convierte "0", "0", "0", "0" en "0000" como una sola cadena continua.
+  codigo_formateado <- paste0("ESP", ceros, CODBU)
+  # Asegurarse de que la longitud sea de 12 caracteres
+  return(substr(codigo_formateado, 1, 12))
+}
+
+#aplicar la función a los datos
+
+data_1$VE_REF <- sapply(data_1$CFPO, create_cfr)
+data_1$VE_REF <- as.factor(data_1$VE_REF)
+
+data_2$VE_REF <- sapply(data_2$CFPO, create_cfr)
+data_2$VE_REF <- as.factor(data_2$VE_REF)
+
+#Borro CFPO
+data_1$CFPO<- NULL
+data_2$CFPO<- NULL
+
+#se unen las columnas de fecha y hora: Para ello
+# usamos el paquete lubridate del tidyverse. OJO CON EL TIMEZONE.
+#Un timestamp suele tener: Fecha: día, mes, año Hora: horas, minutos, segundos
+
+data_1 <- data_1 %>%
+  mutate(SI_TIMESTAMP = dmy_hms(paste(data_1$FECHA,
+                                      data_1$HORA),
+                                tz = "Europe/Madrid")) 
+
+data_2 <- data_2 %>%
+  mutate(SI_TIMESTAMP = dmy_hms(paste(data_2$FECHA,
+                                      data_2$HORA),
+                                tz = "Europe/Madrid"))
+
+#ordenamos las columnas (Serna lo hace de otra forma) y borramos fecha y hora
+
+data_1 <- data_1[,c(8,9,3:6)]
+data_2 <- data_2[,c(8,9,3:6)]
+
+#Se re-calculan la velocidad y el rumbo, pues se asume que los valores son erróneos
+#VELOCIDAD: 
+#Calculamos diferencias de tiempo y velocidades (en nudos)
+# SI_TDIFF: diferencia de tiempo entre el timestamp actual y el anterior 
+# SI_SPCA: calcula la velocidad = distancia / tiempo, Se multiplica por 1.94384 para convertir de m/s a nudos (1 m/s ≈ 1.94384 nudos).
+# 1 m/s=3600/1852nudos=1.94384 nudos
+# Un nudo (kt) se define como una milla náutica por hora.
+# 1 milla náutica = 1852 m
+# 1 hora = 3600 s
+data_1 <- data_1 %>%
+  group_by(VE_REF, floor_date(data_1$SI_TIMESTAMP, unit = "day")) %>%  #agrupa por barco y día
+  mutate(
+    SI_DISTANCECA = distHaversine(cbind(lag(LONGITUD), lag(LATITUD)),  #Calcula la distancia en metros entre cada punto y el anterior, usando la fórmula de Haversine (para distancias geodésicas sobre la Tierra).
+                                  cbind(LONGITUD, LATITUD))
+  ) %>%
+  mutate(
+    SI_TDIFF = (SI_TIMESTAMP - lag(SI_TIMESTAMP)),
+    SI_SPCA = (SI_DISTANCECA / as.numeric(SI_TDIFF)) * 1.94384
+  ) %>%
+  ungroup()
+
+data_2 <- data_2 %>%
+  group_by(VE_REF, floor_date(data_2$SI_TIMESTAMP, unit = "day")) %>%  #agrupa por barco y día
+  mutate(
+    SI_DISTANCECA = distHaversine(cbind(lag(LONGITUD), lag(LATITUD)),  #Calcula la distancia en metros entre cada punto y el anterior, usando la fórmula de Haversine (para distancias geodésicas sobre la Tierra).
+                                  cbind(LONGITUD, LATITUD))
+  ) %>%
+  mutate(
+    SI_TDIFF = (SI_TIMESTAMP - lag(SI_TIMESTAMP)),
+    SI_SPCA = (SI_DISTANCECA / as.numeric(SI_TDIFF)) * 1.94384
+  ) %>%
+  ungroup()
+
+#borramos la columna de floor_date
+data_1 <- data_1[, -7]
+data_2 <- data_2[, -7]
+
+# Convertimos las columnas de latitud y longitud a geometrías POINT
+# usando la librería sf.
+#Serna extrae las coordenadas como un objeto independiente, para poder a continuación poder calcular el rumbo
+
+points_1 <- data_1 %>%
+  select(LONGITUD, LATITUD) %>%
+  st_as_sf(coords = c("LONGITUD", "LATITUD"), crs = 4326) #El resultado es un objeto espacial coords con puntos geográficos (longitud-latitud).
+points_2 <- data_2 %>%
+  select(LONGITUD, LATITUD) %>%
+  st_as_sf(coords = c("LONGITUD", "LATITUD"), crs = 4326)
+
+# st_coordinates() extrae las coordenadas de los puntos y las devuelve como una matriz numérica.
+coords_matrix_1 <- st_coordinates(points_1) #Esta matriz se puede usar fácilmente para cálculos matemáticos o geométricos
+coords_matrix_2 <- st_coordinates(points_2)
+
+
+# Calculamos el RUMBO medio entre puntos consecutivos usando bearing
+# ---------------------------------------------------------------
+# La función bearing() nos da la dirección inicial para ir de un punto p1 a un punto p2
+# sobre la superficie de la Tierra, siguiendo la ruta más corta (geodésico).
+#
+# Es decir, calcula el ángulo en grados entre los dos puntos considerando que la Tierra
+# es curva (elipsoide WGS84), no plana.
+#
+# Aplicando esto a todos los puntos consecutivos de una trayectoria:
+# - Se obtiene el rumbo del punto 1 al 2, del 2 al 3, del 3 al 4, y así sucesivamente.
+# - Este rumbo indica hacia dónde "apunta" el movimiento al inicio de cada segmento.
+
+
+bearings_1 <- bearing(coords_matrix_1[-nrow(coords_matrix_1), ], coords_matrix_1[-1, ])
+bearings_2 <- bearing(coords_matrix_2[-nrow(coords_matrix_2), ], coords_matrix_2[-1, ])
+
+data_1$SI_COG <- c(NA, if_else(bearings_1 < 0, bearings_1 + 360, bearings_1))
+data_2$SI_COG <- c(NA, if_else(bearings_2 < 0, bearings_2 + 360, bearings_2))
+#Course Over Ground (COG) “Rumbo sobre el suelo”.
+#Si el rumbo (bearing) es negativo, le suma 360 para convertirlo a un ángulo positivo en el rango [0, 360).
+#Si no es negativo, deja el valor tal cual.
+
+
+# Eliminamos la primera fila ya que tendrá un NA creado al calcular la velocidad
+data_1 <- na.omit(data_1)
+data_2 <- na.omit(data_2)
+
+
+# Añadimos las columnas que es necesario completar y estimar. Estas por defecto
+# estarán vacías El código FT_REF estará compuesto por 3 letras (abreviatura de
+# centro) y números correlativos unidos por _
+
+
+# Marea
+data_1$FT_REF <- NA
+data_1$FT_REF <- as.factor(data_1$FT_REF)
+
+data_2$FT_REF <- NA
+data_2$FT_REF <- as.factor(data_2$FT_REF)
+
+#Creamos codigo de marea
+data_1 <- data_1 %>%
+  mutate(
+    FT_REF = paste0(VE_REF, "_", format(as.Date(SI_TIMESTAMP, tz = "Europe/Madrid"), "%Y_%m_%d"))
+  )
+
+data_2 <- data_2 %>%
+  mutate(
+    FT_REF = paste0(VE_REF, "_", format(as.Date(SI_TIMESTAMP, tz = "Europe/Madrid"), "%Y_%m_%d"))
+  )
+
+
+# Metier nivel 4
+data_1$LE_MET4 <- NA
+data_1$LE_MET4 <- as.factor(data_1$LE_MET4)
+
+data_2$LE_MET4 <- NA
+data_2$LE_MET4 <- as.factor(data_2$LE_MET4)
+
+#Metier nivel 6
+data_1$LE_MET6 <- NA
+data_1$LE_MET6 <- as.factor(data_1$LE_MET6)
+
+data_2$LE_MET6 <- NA
+data_2$LE_MET6 <- as.factor(data_2$LE_MET6)
+
+# Estado
+#
+# PESCA: TRUE
+# NO PESCA: FALSE
+
+data_1$SI_FSTATUS <- NA
+data_1$SI_FSTATUS <- as.factor(data_1$SI_FSTATUS)
+
+data_2$SI_FSTATUS <- NA
+data_2$SI_FSTATUS <- as.factor(data_2$SI_FSTATUS)
+
+# Observador
+#
+# Observador embarcado : TRUE
+# Observador no embarcado: FALSE
+
+data_1$SU_ISOB <- NA
+data_1$SU_ISOB <- as.factor(data_1$SU_ISOB)
+
+data_2$SU_ISOB <- NA
+data_2$SU_ISOB <- as.factor(data_2$SU_ISOB)
+
+
+# OGT
+# Equipado: TRUE
+# No equipado: FALSE
+data_1$SI_OGT <- NA
+data_1$SI_OGT <- as.factor(data_1$SI_OGT)
+
+data_2$SI_OGT <- NA
+data_2$SI_OGT <- as.factor(data_2$SI_OGT)
+
+
+# En los GPS podríamos identificar también las operaciones de pesca
+# En las cajas verdes este campo estará vacío, pero por homogeneidad
+# de formato incluimos también esta columna
+#
+# LARGADA: SE
+# VIRADA: HA
+# ESPERA: WT (tiempo entre fin de largada e inicio de virada)
+# NAVEGACION: ST
+#
+# Añadimos la culumna apropiada, que estará inicialmente vacía
+data_1 <- data_1 %>%
+  mutate(SI_FOPER = NA)
+
+data_1$SI_FOPER <- as.factor(data_1$SI_FOPER)
+
+data_2 <- data_2 %>%
+  mutate(SI_FOPER = NA)
+
+data_2$SI_FOPER <- as.factor(data_2$SI_FOPER)
+
+# Nos quedamos con el dataframe como nos interesa
+
+# vessel_track_df <- vessel_track_df %>%
+#   select(VE_REF, FT_REF, SI_TIMESTAMP, SI_LATI, SI_LONG, SI_SP, SI_SPCA, SI_HE,
+#          SI_COG, SI_DISTANCECA, SI_TDIFF, LE_MET4, LE_MET6,
+#          SI_FSTATUS, SI_FOPER, SU_ISOB, SI_OGT)
+
+
+data_1 <- data_1 %>%
+select(VE_REF, FT_REF, SI_TIMESTAMP, LATITUD, LONGITUD, VELOCIDAD, SI_SPCA, RUMBO,
+       SI_COG, SI_DISTANCECA, SI_TDIFF, LE_MET4, LE_MET6,
+       SI_FSTATUS, SI_FOPER, SU_ISOB, SI_OGT) %>%
+  mutate(
+    # Convertimos timestamp a formato dd/mm/yyyy HH:MM:SS con / para Access
+    SI_TIMESTAMP = format(SI_TIMESTAMP, "%d/%m/%Y %H:%M:%S")
+  )
+
+data_1 <- data_1 %>% rename(SI_LATI = LATITUD, SI_LONG = LONGITUD, SI_SP = VELOCIDAD, SI_HE = RUMBO)
+
+
+data_2 <- data_2 %>%
+select(VE_REF, FT_REF, SI_TIMESTAMP, LATITUD, LONGITUD, VELOCIDAD, SI_SPCA, RUMBO,
+       SI_COG, SI_DISTANCECA, SI_TDIFF, LE_MET4, LE_MET6,
+       SI_FSTATUS, SI_FOPER, SU_ISOB, SI_OGT) %>%
+  mutate(
+    # Convertimos timestamp a formato dd/mm/yyyy HH:MM:SS con / para Access
+    SI_TIMESTAMP = format(SI_TIMESTAMP, "%d/%m/%Y %H:%M:%S")
+  )
+
+data_2 <- data_2 %>% rename(SI_LATI = LATITUD, SI_LONG = LONGITUD, SI_SP = VELOCIDAD, SI_HE = RUMBO)
+
+# Podemos guardar ya el fichero en formato csv
+#así es como lo hace Serna:
+#write.table(vessel_track_df,
+          #  file = csv_formateado,
+          #   sep = ";",
+          #  dec = ",",
+          #  row.names = FALSE,
+          #  col.names = TRUE,
+          #  quote = FALSE)
+#st_write(data_1, "//tsclient/D/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/CV_2024_ZE_1_formateado.csv")
+st_write(data_1, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/CV_2024_ZE_1_formateado.csv")
+st_write(data_2, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/CV_2024_ZE_2_formateado.csv")
+
+
+```
+
+
+#Unión datos notas de venta a logbook
+Una vez recortados los datos según la zona de estudio, en este caso la Demaración Sudatlántica, se unen con las notas de venta
+
+```{r}
+#Cargar los datos. Hay que asegurarse que el formato de las bases de dato (separadores de campo, codificación, separadores decimales, etc.) coinciden para todos los archivos.
+
+#CV_2024_ZE_2 <- read.csv2("D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/CV_2024_ZE_2_formateado.csv", sep = ";")
+#NV_2024 <- read.csv2("D:/HUMUH_Ecología Presiones Humanas/PESCA/DATOS/Junta Andalucía/Notas de Venta_2018_2025/20251001 IEO NV 2018-2025/20250930 NV 2024.csv", sep = ";")
+
+CV_2024_ZE_1 <- data_1
+CV_2024_ZE_2 <- data_2
+
+#renombrar algunas columnas
+NV_2024 <- NV_2024 %>% rename(VE_REF = ID_UDPROD)
+
+#Crear una columna que incluya la REF y fecha. Pueden salir más de una entrada, pero es porque una misma fecha puede tener varias especies
+
+NV_2024$FT_REF <- NA
+NV_2024$FT_REF <- as.factor(NV_2024$FT_REF)
+#Indicamos que el campo FT_REF debe tener el código de la embarcación y la fecha (Y_m_d), que previamente se ha indicado que el campo fecha (tipo character) se debe interpretar como fecha en formato d/m/Y
+
+NV_2024 <- NV_2024 %>%
+   mutate(
+     FT_REF = paste0(VE_REF, "_", format(as.Date(FECHAVENTA, "%d/%m/%Y"), "%Y_%m_%d"))
+   )
+
+#Ahora se unen CV y NV a través del campo FT_REF
+
+CV_NV_2024_ZE_1 <- merge(CV_2024_ZE_1, NV_2024, by = "FT_REF")
+CV_NV_2024_ZE_1 <- CV_NV_2024_ZE_1[, -c(17)] #eliminar columna VE_REF duplicada
+CV_NV_2024_ZE_1 <- CV_NV_2024_ZE_1 %>% rename(VE_REF = VE_REF.x)#renombrar columan VE_REF
+
+CV_NV_2024_ZE_2 <- merge(CV_2024_ZE_2, NV_2024, by = "FT_REF")
+CV_NV_2024_ZE_2 <- CV_NV_2024_ZE_2[, -c(17)] #eliminar columna VE_REF duplicada
+CV_NV_2024_ZE_2 <- CV_NV_2024_ZE_2 %>% rename(VE_REF = VE_REF.x)#renombrar columan VE_REF
+
+
+#A continuación en la columna LE_MET4 se asignan las siglas por arte
+
+CV_NV_2024_ZE_1$LE_MET4 <- ifelse(CV_NV_2024_ZE_1$ARTE == "RASTRA", "DRB", 
+                                  ifelse(CV_NV_2024_ZE_1$ARTE == "LÃ\u008dNEAS DE MANO Y LÃ\u008dNEAS DE CAÃ‘A (MANUALES)", "LHP", ifelse(CV_NV_2024_ZE_1$ARTE == "REDES DE ENMALLE DE FONDO (CALADAS)","GNS", 
+                                                                                                                                          ifelse(CV_NV_2024_ZE_1$ARTE == "PALANGRES (SIN ESPECIFICAR)","LL", 
+                                                                                                                                                 ifelse(CV_NV_2024_ZE_1$ARTE == "RED COMBINADA DE ENMALLE-TRASMALLO","GTN", 
+                                                                                                                                                        ifelse(CV_NV_2024_ZE_1$ARTE == "NASAS","FPO", ifelse(CV_NV_2024_ZE_1$ARTE == "TRASMALLOS","GTR", ifelse(CV_NV_2024_ZE_1$ARTE == "REDES DE ENMALLE (SIN ESPECIFICAR)","GN",ifelse(CV_NV_2024_ZE_1$ARTE == "PALANGRES CALADOS","LLS",ifelse(CV_NV_2024_ZE_1$ARTE == "TRAMPAS (SIN ESPECIFICAR)","FIX",ifelse(CV_NV_2024_ZE_1$ARTE == "ANZUELOS Y LÃ\u008dNEAS (SIN ESPECIFICAR)","LX",ifelse(CV_NV_2024_ZE_1$ARTE == "PALANGRES DE DERIVA","LLD",ifelse(CV_NV_2024_ZE_1$ARTE == "CURRICANES","LTL", ifelse(CV_NV_2024_ZE_1$ARTE == "OTROARTE","NK", ifelse(CV_NV_2024_ZE_1$ARTE == "DRAGAS MECANIZADAS (HIDRÃ\u0082ULICAS...)","HMD", "")))))))))))))))
+
+CV_NV_2024_ZE_2$LE_MET4 <- ifelse(CV_NV_2024_ZE_2$ARTE == "RASTRA", "DRB", ifelse(CV_NV_2024_ZE_2$ARTE == "REDES DE ENMALLE (SIN ESPECIFICAR)", "GN", ifelse(CV_NV_2024_ZE_2$ARTE == "DRAGAS MECANIZADAS (HIDRÃ\u0081ULICAS...)","HMD", ifelse(CV_NV_2024_ZE_2$ARTE == "TRAMPAS (SIN ESPECIFICAR)","FIX", ifelse(CV_NV_2024_ZE_2$ARTE == "RASTRA","DRB", ifelse(CV_NV_2024_ZE_2$ARTE == "NASAS","FPO", ifelse(CV_NV_2024_ZE_2$ARTE == "PALANGRES DE DERIVA","LLD", ifelse(CV_NV_2024_ZE_2$ARTE == "OTROARTE","NK", ifelse(CV_NV_2024_ZE_2$ARTE == "RED COMBINADA DE ENMALLE-TRASMALLO","GTN", "")))))))))
+                                                                                    
+                                                                #"LÃ\u008dNEAS DE MANO Y LÃ\u008dNEAS DE CAÃ‘A (MANUALES)", "LHP_LHM", ifelse(CV_NV_2024_ZE_2$ARTE == "REDES DE ENMALLE DE FONDO (CALADAS)","GNS", ifelse(CV_NV_2024_ZE_2$ARTE == "TRASMALLOS" | CV_NV_2024_ZE_2$ARTE == "RED COMBINADA DE ENMALLE-TRASMALLO", "GTR", ifelse(CV_NV_2024_ZE_2$ARTE == "NASAS", "FPO", ifelse(CV_NV_2024_ZE_2$ARTE == "PALANGRES (SIN ESPECIFICAR)" | CV_NV_2024_ZE_2$ARTE == "PALANGRES CALADOS", "LLS", ""))))))
+
+CV_NV_2024_ZE_1 <- CV_NV_2024_ZE_1[!c(CV_NV_2024_ZE_1$ARTE == "RED DE ARRASTRE DE FONDO CON PUERTAS" | CV_NV_2024_ZE_1$ARTE == "RED DE CERCO CON JARETA MANIOBRADA DESDE UNA EMBARCACIÃ“N" | CV_NV_2024_ZE_1$ARTE == "RED DE CERCO CON JARETA"),] #se eliminan las filas de cerco y arrastre
+
+CV_NV_2024_ZE_2 <- CV_NV_2024_ZE_2[!c(CV_NV_2024_ZE_2$ARTE == "RED DE ARRASTRE DE FONDO CON PUERTAS" | CV_NV_2024_ZE_2$ARTE == "RED DE CERCO CON JARETA MANIOBRADA DESDE UNA EMBARCACIÃ“N" | CV_NV_2024_ZE_2$ARTE == "RED DE CERCO CON JARETA"),] #se eliminan las filas de cerco y arrastre
+
+
+st_write(CV_NV_2024_ZE_1, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/CV_NV_2024_ZE_1.csv")
+st_write(CV_NV_2024_ZE_2, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/CV_NV_2024_ZE_2.csv")
+
+```
+
+#Separar por artes de pesca y unir para DM SUD
+```{r}
+
+CV_NV_2024_ZE_1_GN <- CV_NV_2024_ZE_1[CV_NV_2024_ZE_1$LE_MET4 == "GN",]
+CV_NV_2024_ZE_1_HMD <- CV_NV_2024_ZE_1[CV_NV_2024_ZE_1$LE_MET4 == "HMD",]
+CV_NV_2024_ZE_1_DRB <- CV_NV_2024_ZE_1[CV_NV_2024_ZE_1$LE_MET4 == "DRB",]
+CV_NV_2024_ZE_1_FIX <- CV_NV_2024_ZE_1[CV_NV_2024_ZE_1$LE_MET4 == "FIX",]
+CV_NV_2024_ZE_1_FPO <- CV_NV_2024_ZE_1[CV_NV_2024_ZE_1$LE_MET4 == "FPO",]
+CV_NV_2024_ZE_1_LLD <- CV_NV_2024_ZE_1[CV_NV_2024_ZE_1$LE_MET4 == "LLD",]
+CV_NV_2024_ZE_1_NK <- CV_NV_2024_ZE_1[CV_NV_2024_ZE_1$LE_MET4 == "NK",]
+CV_NV_2024_ZE_1_GTN <- CV_NV_2024_ZE_1[CV_NV_2024_ZE_1$LE_MET4 == "GTN",]
+CV_NV_2024_ZE_1_LHP <- CV_NV_2024_ZE_1[CV_NV_2024_ZE_1$LE_MET4 == "LHP",]
+CV_NV_2024_ZE_1_GNS <- CV_NV_2024_ZE_1[CV_NV_2024_ZE_1$LE_MET4 == "GNS",]
+CV_NV_2024_ZE_1_LL <- CV_NV_2024_ZE_1[CV_NV_2024_ZE_1$LE_MET4 == "LL",]
+CV_NV_2024_ZE_1_GTR <- CV_NV_2024_ZE_1[CV_NV_2024_ZE_1$LE_MET4 == "GTR",]
+CV_NV_2024_ZE_1_LLS <- CV_NV_2024_ZE_1[CV_NV_2024_ZE_1$LE_MET4 == "LLS",]
+CV_NV_2024_ZE_1_LX <- CV_NV_2024_ZE_1[CV_NV_2024_ZE_1$LE_MET4 == "LX",]
+CV_NV_2024_ZE_1_LTL <- CV_NV_2024_ZE_1[CV_NV_2024_ZE_1$LE_MET4 == "LTL",]
+
+
+CV_NV_2024_ZE_2_GN <- CV_NV_2024_ZE_2[CV_NV_2024_ZE_2$LE_MET4 == "GN",]
+CV_NV_2024_ZE_2_HMD <- CV_NV_2024_ZE_2[CV_NV_2024_ZE_2$LE_MET4 == "HMD",]
+CV_NV_2024_ZE_2_DRB <- CV_NV_2024_ZE_2[CV_NV_2024_ZE_2$LE_MET4 == "DRB",]
+CV_NV_2024_ZE_2_FIX <- CV_NV_2024_ZE_2[CV_NV_2024_ZE_2$LE_MET4 == "FIX",]
+CV_NV_2024_ZE_2_FPO <- CV_NV_2024_ZE_2[CV_NV_2024_ZE_2$LE_MET4 == "FPO",]
+CV_NV_2024_ZE_2_LLD <- CV_NV_2024_ZE_2[CV_NV_2024_ZE_2$LE_MET4 == "LLD",]
+CV_NV_2024_ZE_2_NK <- CV_NV_2024_ZE_2[CV_NV_2024_ZE_2$LE_MET4 == "NK",]
+CV_NV_2024_ZE_2_GTN <- CV_NV_2024_ZE_2[CV_NV_2024_ZE_2$LE_MET4 == "GTN",]
+
+
+
+
+
+CV_NV_2024_ZE_GN <- merge(CV_NV_2024_ZE_1_GN, CV_NV_2024_ZE_2_GN, all=T)
+CV_NV_2024_ZE_HMD <- merge(CV_NV_2024_ZE_1_HMD, CV_NV_2024_ZE_2_HMD, all=T)
+CV_NV_2024_ZE_DRB <- merge(CV_NV_2024_ZE_1_DRB, CV_NV_2024_ZE_2_DRB, all=T)
+CV_NV_2024_ZE_FIX <- merge(CV_NV_2024_ZE_1_FIX, CV_NV_2024_ZE_2_FIX, all=T)
+CV_NV_2024_ZE_FPO <- merge(CV_NV_2024_ZE_1_FPO, CV_NV_2024_ZE_2_FPO, all=T)
+CV_NV_2024_ZE_LLD <- merge(CV_NV_2024_ZE_1_LLD, CV_NV_2024_ZE_2_LLD, all=T)
+CV_NV_2024_ZE_NK <- merge(CV_NV_2024_ZE_1_NK, CV_NV_2024_ZE_2_NK, all=T)
+CV_NV_2024_ZE_GTN <- merge(CV_NV_2024_ZE_1_GTN, CV_NV_2024_ZE_2_GTN, all=T)
+CV_NV_2024_ZE_LHP <- CV_NV_2024_ZE_1_LHP
+CV_NV_2024_ZE_GNS <- CV_NV_2024_ZE_1_GNS
+CV_NV_2024_ZE_LL <- CV_NV_2024_ZE_1_LL
+CV_NV_2024_ZE_GTR <- CV_NV_2024_ZE_1_GTR
+CV_NV_2024_ZE_LLS <- CV_NV_2024_ZE_1_LLS
+CV_NV_2024_ZE_LX <- CV_NV_2024_ZE_1_LX
+CV_NV_2024_ZE_LTL <- CV_NV_2024_ZE_1_LTL
+
+st_write(CV_NV_2024_ZE_GN, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/GN_2024_ZE.csv")
+st_write(CV_NV_2024_ZE_HMD, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/HMD_2024_ZE.csv")
+st_write(CV_NV_2024_ZE_DRB, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/DRB_2024_ZE.csv")
+st_write(CV_NV_2024_ZE_FIX, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/FIX_2024_ZE.csv")
+st_write(CV_NV_2024_ZE_FPO, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/FPO_2024_ZE.csv")
+st_write(CV_NV_2024_ZE_LLD, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/LLD_2024_ZE.csv")
+st_write(CV_NV_2024_ZE_NK, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/NK_2024_ZE.csv")
+st_write(CV_NV_2024_ZE_GTN, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/GTN_2024_ZE.csv")
+st_write(CV_NV_2024_ZE_LHP, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/LHP_2024_ZE.csv")
+st_write(CV_NV_2024_ZE_GNS, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/GNS_2024_ZE.csv")
+st_write(CV_NV_2024_ZE_LL, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/LL_2024_ZE.csv")
+st_write(CV_NV_2024_ZE_GTR, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/GTR_2024_ZE.csv")
+st_write(CV_NV_2024_ZE_LLS, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/LLS_2024_ZE.csv")
+st_write(CV_NV_2024_ZE_LX, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/LX_2024_ZE.csv")
+st_write(CV_NV_2024_ZE_LTL, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/LTL_2024_ZE.csv")
+
+
+```
+
+#Creación de grids
+
+```{r}
+csquare.cod<-function(lon, lat, degrees){
+  if (length(lon) != length(lat)) 
+    stop("length of longitude not equal to length of latitude")
+  if (!degrees %in% c(10, 5, 1, 0.5, 0.1, 0.05, 0.01,0.005,0.001)) 
+    stop("degrees specified not in range: c(10,5,1,0.5,0.1,0.05,0.01,0.005,0.001)")
+  dims <- length(lon)
+  quadrants <- array(NA, dim = c(5, 6, dims), dimnames = list(c("globalQuadrant","intmQuadrant1", "intmQuadrant2", "intmQuadrant3","intmQuadrant4"),c("quadrantDigit", "latDigit", "lonDigit","latRemain", "lonRemain", "code"),seq(1, dims, 1)))
+  quadrants["globalQuadrant", "quadrantDigit",] <- 4 - (((2 * floor(1 + (lon/200))) - 1) * ((2 * floor(1 + (lat/200))) + 1))
+  quadrants["globalQuadrant", "latDigit", ] <- floor(abs(lat)/10)
+  quadrants["globalQuadrant", "lonDigit", ] <- floor(abs(lon)/10)
+  quadrants["globalQuadrant", "latRemain", ] <- round(abs(lat) - (quadrants["globalQuadrant", "latDigit", ] * 10), 7)
+  quadrants["globalQuadrant", "lonRemain", ] <- round(abs(lon) - (quadrants["globalQuadrant", "lonDigit", ] * 10), 7)
+  quadrants["globalQuadrant", "code", ] <- quadrants["globalQuadrant", "quadrantDigit", ] * 1000 + quadrants["globalQuadrant", "latDigit", ] * 100 + quadrants["globalQuadrant", "lonDigit", ]
+  quadrants["intmQuadrant1", "quadrantDigit", ] <- (2 * floor(quadrants["globalQuadrant", "latRemain", ] * 0.2)) + floor(quadrants["globalQuadrant", "lonRemain", ] * 0.2) + 1
+  quadrants["intmQuadrant1", "latDigit", ] <- floor(quadrants["globalQuadrant", "latRemain", ])
+  quadrants["intmQuadrant1", "lonDigit", ] <- floor(quadrants["globalQuadrant", "lonRemain", ])
+  quadrants["intmQuadrant1", "latRemain", ] <- round((quadrants["globalQuadrant","latRemain", ] - quadrants["intmQuadrant1", "latDigit", ]) * 10, 7)
+  quadrants["intmQuadrant1", "lonRemain", ] <- round((quadrants["globalQuadrant", "lonRemain", ] - quadrants["intmQuadrant1", "lonDigit", ]) * 10, 7)
+  quadrants["intmQuadrant1", "code", ] <- quadrants["intmQuadrant1", "quadrantDigit", ] * 100 + quadrants["intmQuadrant1", "latDigit", ] * 10 + quadrants["intmQuadrant1", "lonDigit", ]
+  quadrants["intmQuadrant2", "quadrantDigit", ] <- (2 * floor(quadrants["intmQuadrant1", "latRemain", ] * 0.2)) + floor(quadrants["intmQuadrant1", "lonRemain", ] * 0.2) + 1
+  quadrants["intmQuadrant2", "latDigit", ] <- floor(quadrants["intmQuadrant1", "latRemain", ])
+  quadrants["intmQuadrant2", "lonDigit", ] <- floor(quadrants["intmQuadrant1", "lonRemain", ])
+  quadrants["intmQuadrant2", "latRemain", ] <- round((quadrants["intmQuadrant1", "latRemain", ] - quadrants["intmQuadrant2", "latDigit", ]) * 10, 7)
+  quadrants["intmQuadrant2", "lonRemain", ] <- round((quadrants["intmQuadrant1", "lonRemain", ] - quadrants["intmQuadrant2", "lonDigit", ]) * 10, 7)
+  quadrants["intmQuadrant2", "code", ] <- quadrants["intmQuadrant2", "quadrantDigit", ] * 100 + quadrants["intmQuadrant2", "latDigit", ] * 10 + quadrants["intmQuadrant2", "lonDigit", ]
+  quadrants["intmQuadrant3", "quadrantDigit", ] <- (2 * floor(quadrants["intmQuadrant2", "latRemain", ] * 0.2)) + floor(quadrants["intmQuadrant2", "lonRemain", ] * 0.2) + 1
+  quadrants["intmQuadrant3", "latDigit", ] <- floor(quadrants["intmQuadrant2", "latRemain", ])
+  quadrants["intmQuadrant3", "lonDigit", ] <- floor(quadrants["intmQuadrant2", "lonRemain", ])
+  quadrants["intmQuadrant3", "latRemain", ] <- round((quadrants["intmQuadrant2","latRemain", ] - quadrants["intmQuadrant3", "latDigit", ]) * 10, 7)
+  quadrants["intmQuadrant3", "lonRemain", ] <- round((quadrants["intmQuadrant2", "lonRemain", ] - quadrants["intmQuadrant3", "lonDigit", ]) * 10, 7)
+  quadrants["intmQuadrant3", "code", ] <- quadrants["intmQuadrant3", "quadrantDigit", ] * 100 + quadrants["intmQuadrant3", "latDigit", ] * 10 + quadrants["intmQuadrant3", "lonDigit", ]
+  quadrants["intmQuadrant4", "quadrantDigit", ] <- (2 * floor(quadrants["intmQuadrant3", "latRemain", ] * 0.2)) + floor(quadrants["intmQuadrant3", "lonRemain", ] * 0.2) + 1
+  quadrants["intmQuadrant4", "latDigit", ] <- floor(quadrants["intmQuadrant3", "latRemain", ])
+  quadrants["intmQuadrant4", "lonDigit", ] <- floor(quadrants["intmQuadrant3", "lonRemain", ])
+  quadrants["intmQuadrant4", "latRemain", ] <- round((quadrants["intmQuadrant3","latRemain", ] - quadrants["intmQuadrant4", "latDigit", ]) * 10, 7)
+  quadrants["intmQuadrant4", "lonRemain", ] <- round((quadrants["intmQuadrant3", "lonRemain", ] - quadrants["intmQuadrant4", "lonDigit", ]) * 10, 7)
+  quadrants["intmQuadrant4", "code", ] <- quadrants["intmQuadrant4","quadrantDigit", ] * 100 + quadrants["intmQuadrant4","latDigit", ] * 10 + quadrants["intmQuadrant4", "lonDigit", ]
+  if (degrees == 10) 
+    CSquareCodes <- quadrants["globalQuadrant", "code",]
+  if (degrees == 5) 
+    CSquareCodes <- paste(quadrants["globalQuadrant", "code", ], ":", quadrants["intmQuadrant1", "quadrantDigit", ], sep = "")
+  if (degrees == 1) 
+    CSquareCodes <- paste(quadrants["globalQuadrant", "code", ], ":", quadrants["intmQuadrant1", "code", ], sep = "")
+  if (degrees == 0.5) 
+    CSquareCodes <- paste(quadrants["globalQuadrant", "code", ], ":", quadrants["intmQuadrant1", "code", ], ":", quadrants["intmQuadrant2", "quadrantDigit", ], sep = "")
+  if (degrees == 0.1) 
+    CSquareCodes <- paste(quadrants["globalQuadrant", "code", ], ":", quadrants["intmQuadrant1", "code", ], ":", quadrants["intmQuadrant2", "code", ], sep = "")
+  if (degrees == 0.05) 
+    CSquareCodes <- paste(quadrants["globalQuadrant", "code", ], ":", quadrants["intmQuadrant1", "code", ], ":", quadrants["intmQuadrant2", "code", ], ":", quadrants["intmQuadrant3", "quadrantDigit", ], sep = "")
+  if (degrees == 0.01) 
+    CSquareCodes <- paste(quadrants["globalQuadrant", "code", ], ":", quadrants["intmQuadrant1", "code", ], ":", quadrants["intmQuadrant2", "code", ], ":", quadrants["intmQuadrant3", "code", ], sep = "")
+  if (degrees == 0.005) 
+    CSquareCodes <- paste(quadrants["globalQuadrant", "code", ], ":", quadrants["intmQuadrant1", "code", ], ":", quadrants["intmQuadrant2", "code", ], ":", quadrants["intmQuadrant3", "code", ], ":", quadrants["intmQuadrant4", "quadrantDigit", ], sep = "")
+  if (degrees == 0.001) 
+    CSquareCodes <- paste(quadrants["globalQuadrant", "code", ], ":", quadrants["intmQuadrant1", "code", ], ":", quadrants["intmQuadrant2", "code", ], ":", quadrants["intmQuadrant3", "code", ], ":", quadrants["intmQuadrant4", "code", ], sep = "")
+  
+  return(CSquareCodes)
+}
+
+#TENGO QUE AVERIGUAR COMO PONER EL CÓDIGO PARA EL CUADRANTE DE 0.0005
+
+resolution <- 0.005
+resolution <- 0.001
+
+
+#---esquinas de la zona de estudio
+#-esquina inferior izq
+x.ini.izq.inf <-(-5)#usar números enteros
+y.ini.izq.inf <-(34)
+#-esquina superior drch
+x.fin.dch.sup <- (-8)
+y.fin.dch.sup <-(38)
+
+xncell<-abs(x.ini.izq.inf-x.fin.dch.sup)/resolution
+yncell<-abs(y.ini.izq.inf-y.fin.dch.sup)/resolution
+
+df<-data.frame(ID=1:(xncell*yncell))
+
+gr<-st_sfc(st_make_grid(cellsize=resolution,
+                        offset=c(x.ini.izq.inf,y.ini.izq.inf),n=c(xncell,yncell),
+                        what="polygons",square=T,crs=4326))
+
+st_geometry(df)<-gr
+
+#---- Add centroides
+df$centroid <- st_centroid(df$geometry)
+head(df)
+df$LONG_CENT<-as.numeric(st_coordinates(st_centroid(df$geometry))[,1])
+df$LAT_CENT<-as.numeric(st_coordinates(st_centroid(df$geometry))[,2])
+
+#---- Add area de cada tesela
+df$area_km2 <- as.numeric(st_area(df))/1000000# en km2
+
+head(df)
+
+#---- asigna Csquare
+df$csq<-as.character(csquare.cod(df$LONG_CENT,df$LAT_CENT,resolution))
+
+head(df)
+
+st_write(df, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/ISMS 2026/DATOS/csq_DMSUD_0.001.shp")
+
+```
+
+#Unir datos a grid
+Aquí hay que tener cuidado, porque cada grid deberá ser generado para un tipo de dato. Es decir, cada csq solo puede tener asociado un dato (x.ej. suma nº barcos palangre) al centroide. De no ser así el grid se genera con errores, asociado los datos a los límites del polígono y no al centroide, donde solo se registra uno de los datos.
+```{r}
+#1º asignar a cada dato un csq
+
+resolution <- 0.005
+
+CV_NV_2024_ZE_DRB$csq<-csquare.cod(CV_NV_2024_ZE_DRB$SI_LONG, CV_NV_2024_ZE_DRB$SI_LATI,resolution) #creo columna de csq para unir los datos al grid / Revisar que las columna de longitud y latitud sean de tipo numérico
+
+#AQUI HAY QUE HACER LA MISMA LÍNEA DE CÓDIGO PARA TODAS LAS ARTES
+
+#2º Filtrar cada arte por su velocidad de trabajo (virada y/o calada)
+#Draga macanizada (DRB) -> 0,05 a 0,6 nudos
+#Trampa (potera o nasa) (FPO) -> 0,4 a 2,6 nudos
+#Trasmallo (GTR) -> 0,1 a 1,5 nudos
+#Enmalle (GNS) -> 0,2 a 2,4 nudos
+#Palangre (LLS) -> 0,2 a 2 nudos
+#Línea de mano - atún (LHP_LHM) -> 2 a 8 nudos
+
+
+Datos_Huella_DRB_fil <- Datos_Huella_DRB %>%
+  mutate(SI_SPCA = as.numeric(SI_SPCA)) %>%
+  filter(SI_SPCA >= 0.05,
+         SI_SPCA <= 0.5)
+Datos_Huella_FPO_fil <- Datos_Huella_FPO %>%
+  mutate(SI_SPCA = as.numeric(SI_SPCA)) %>%
+  filter(SI_SPCA >= 0.4,
+         SI_SPCA <= 2.6)
+Datos_Huella_GTR_fil <- Datos_Huella_GTR %>%
+  mutate(SI_SPCA = as.numeric(SI_SPCA)) %>%
+  filter(SI_SPCA >= 0.1,
+         SI_SPCA <= 1.5)
+Datos_Huella_GNS_fil <- Datos_Huella_GNS %>%
+  mutate(SI_SPCA = as.numeric(SI_SPCA)) %>%
+  filter(SI_SPCA >= 0.2,
+         SI_SPCA <= 2.4)
+Datos_Huella_LLS_fil <- Datos_Huella_LLS %>%
+  mutate(SI_SPCA = as.numeric(SI_SPCA)) %>%
+  filter(SI_SPCA >= 0.2,
+         SI_SPCA <= 2)
+Datos_Huella_LH_fil <- Datos_Huella_LH %>%
+  mutate(SI_SPCA = as.numeric(SI_SPCA)) %>%
+  filter(SI_SPCA >= 2,
+         SI_SPCA <= 8)
+
+Datos_Huella_fil <- Datos_Huella_1 %>% 
+  filter (
+    (LE_MET4 == "DRB" & SI_SPCA >= 0.05 & SI_SPCA <= 0.5) |
+    (LE_MET4 == "FPO" & SI_SPCA >= 0.4 & SI_SPCA <= 2.6) |
+    (LE_MET4 == "GTR" & SI_SPCA >= 0.1 & SI_SPCA <= 1.5) |
+    (LE_MET4 == "GNS" & SI_SPCA >= 0.2 & SI_SPCA <= 2.4) |
+    (LE_MET4 == "LLS" & SI_SPCA >= 0.2 & SI_SPCA <= 2) |
+    (LE_MET4 == "LHP_LHM" & SI_SPCA >= 2 & SI_SPCA <= 8))
+
+
+dim(Datos_Huella_DRB_fil)
+glimpse(Datos_Huella_DRB_fil)
+
+
+
+#4º agregar los datos por csq en función de lo que queramos obtener / Previamente hay que asegurarse que los registros son únicos por barco y fecha (para no duplicar datos en 1csq)
+#ME HE DADO CUENTA QUE LA HUELLA PESQUERA SE HA CE EN BASE DE Nº BARCO/AÑO/CSQ
+
+#Datos_Huella_LH_distinct <- Datos_Huella_LH %>% distinct(FT_REF, csq, .keep_all = T) #mantiene todas las columnas, aunque hay que ser consciente que aquellas con rumbo, velocidad y dirección se habrán reducido a un registro, siendo, por lo tanto, no representativas
+#Datos_Huella_LLS_distinct <- Datos_Huella_LLS %>% distinct(FT_REF, csq, .keep_all = T)
+#Datos_Huella_FPO_distinct <- Datos_Huella_FPO %>% distinct(FT_REF, csq, .keep_all = T)
+#Datos_Huella_GNS_distinct <- Datos_Huella_GNS %>% distinct(FT_REF, csq, .keep_all = T)
+#Datos_Huella_GTR_distinct <- Datos_Huella_GTR %>% distinct(FT_REF, csq, .keep_all = T)
+#Datos_Huella_DRB_distinct <- Datos_Huella_DRB %>% distinct(FT_REF, csq, .keep_all = T)
+
+#Sería lo mismo pero con VE_REF
+Datos_Huella_LH_distinct <- Datos_Huella_LH_fil %>% 
+  distinct(VE_REF, csq, .keep_all = T)
+Datos_Huella_LLS_distinct <- Datos_Huella_LLS_fil %>% 
+  distinct(VE_REF, csq, .keep_all = T)
+Datos_Huella_FPO_distinct <- Datos_Huella_FPO_fil %>% 
+  distinct(VE_REF, csq, .keep_all = T)
+Datos_Huella_GNS_distinct <- Datos_Huella_GNS_fil %>% distinct(VE_REF, csq, .keep_all = T)
+Datos_Huella_GTR_distinct <- Datos_Huella_GTR_fil %>% distinct(VE_REF, csq, .keep_all = T)
+Datos_Huella_DRB_distinct <- Datos_Huella_DRB_fil %>% distinct(VE_REF, csq, .keep_all = T)
+
+Datos_Huella_distinct <- Datos_Huella_fil %>% 
+  distinct(VE_REF, csq, .keep_all = T)
+
+#Agregar nº barcos por csq
+
+ESFUERZO_LHP_LHM<-aggregate(LE_MET4~csq,data=Datos_Huella_LH_distinct,FUN=length)
+ESFUERZO_LLS<-aggregate(LE_MET4~csq,data=Datos_Huella_LLS_distinct,FUN=length)
+ESFUERZO_FPO<-aggregate(LE_MET4~csq,data=Datos_Huella_FPO_distinct,FUN=length)
+ESFUERZO_GNS<-aggregate(LE_MET4~csq,data=Datos_Huella_GNS_distinct,FUN=length)
+ESFUERZO_GTR<-aggregate(LE_MET4~csq,data=Datos_Huella_GTR_distinct,FUN=length)
+ESFUERZO_DRB<-aggregate(LE_MET4~csq,data=Datos_Huella_DRB_distinct,FUN=length)
+
+ESFUERZO_TOTAL <- aggregate(LE_MET4~csq,data=Datos_Huella_distinct,FUN=length)
+
+#Unir datos a grid
+
+gr_LH<-merge(df_ZE, ESFUERZO_LHP_LHM, all.x=T) #une los datos al grid a través de la columna csq
+gr_LLS<-merge(df_ZE, ESFUERZO_LLS, all.x=T)
+gr_FPO<-merge(df_ZE, ESFUERZO_FPO, all.x=T)
+gr_GNS<-merge(df_ZE, ESFUERZO_GNS, all.x=T)
+gr_GTR<-merge(df_ZE, ESFUERZO_GTR, all.x=T)
+gr_DRB<-merge(df_ZE, ESFUERZO_DRB, all.x=T)
+
+gr_all <- merge(df_ZE, ESFUERZO_TOTAL, all.x=T)
+
+#sustituir NAs o "" por 0 en los grid sin esfuerzo
+
+gr_LH$LE_MET4[which(is.na(gr_LH$LE_MET4))]<-0
+gr_LLS$LE_MET4[which(is.na(gr_LLS$LE_MET4))]<-0
+gr_FPO$LE_MET4[which(is.na(gr_FPO$LE_MET4))]<-0
+gr_GNS$LE_MET4[which(is.na(gr_GNS$LE_MET4))]<-0
+gr_GTR$LE_MET4[which(is.na(gr_GTR$LE_MET4))]<-0
+gr_DRB$LE_MET4[which(is.na(gr_DRB$LE_MET4))]<-0
+
+gr_all$LE_MET4[which(is.na(gr_all$LE_MET4))]<-0
+
+
+gr_LH$LE_MET4[which(gr_LH$LE_MET4 == "")]<-0
+gr_LLS$LE_MET4[which(gr_LLS$LE_MET4 == "")]<-0
+gr_FPO$LE_MET4[which(gr_FPO$LE_MET4 == "")]<-0
+gr_GNS$LE_MET4[which(gr_GNS$LE_MET4 == "")]<-0
+gr_GTR$LE_MET4[which(gr_GTR$LE_MET4 == "")]<-0
+gr_DRB$LE_MET4[which(gr_DRB$LE_MET4 == "")]<-0
+
+
+#Guardar capa en .gpkg / Si se quiere añadir una capa nueva append = T / Si se quiere sobreescribir una existente delete_layer = T
+
+st_write(gr_LH, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/CIPA 2026/DATOS/CIPA 2026.gpkg", layer = "gr_esf_LH", delete_layer = T)
+st_write(gr_LLS, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/CIPA 2026/DATOS/CIPA 2026.gpkg", layer = "gr_esf_LLS", delete_layer = T)
+st_write(gr_FPO, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/CIPA 2026/DATOS/CIPA 2026.gpkg", layer = "gr_esf_FPO", delete_layer = T)
+st_write(gr_GNS, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/CIPA 2026/DATOS/CIPA 2026.gpkg", layer = "gr_esf_GNS", delete_layer = T)
+st_write(gr_GTR, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/CIPA 2026/DATOS/CIPA 2026.gpkg", layer = "gr_esf_GTR", delete_layer = T)
+st_write(gr_DRB, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/CIPA 2026/DATOS/CIPA 2026.gpkg", layer = "gr_esf_DRB", delete_layer = T)
+st_write(gr_all, "D:/HUMUH_Ecología Presiones Humanas/CONGRESOS/CIPA 2026/DATOS/CIPA 2026.gpkg", layer = "gr_esf_all", delete_layer = T)
+
+```
+
+
+
+#Cálculo de core fishing ground (Ulla)
+
+```{r}
+library(foreign)
+library(rgdal)
+library(dplyr)
+library(rje)
+library(ggplot2)
+library(RColorBrewer)
+library(rworldmap)
+library(broom)
+library(sf)
+library(sp)
+library(raster)
+library(datos)
+library(tidyverse)
+library(foreign)
+
+
+SARa<-st_read("C:/Users/User/Dropbox/0_IEO/Ciencia/Papers/VMEs_24_new/VME_paper_Ulla/Scripts/Scripts_cierres_Nora/Scripts_datos_Fishing/Outputs/1_Outputs_Data_preparation/SAR_depth.shp")
+SAR<-st_drop_geometry(SARa)
+
+
+SAR$grid<-1
+names(SAR)
+
+#Core fishing 90% y 95%  ground medium values#####
+
+sel_mean<-SAR[order(SAR[,"mean_16_21"],decreasing = T),]
+sel_mean$cum_mean <- cumsum(sel_mean[,"mean_16_21"])  # get the cumulative sar via function cumsum
+sel_mean$cum_mean2 <- sel_mean$cum_mean / sum(sel_mean[,"mean_16_21"],na.rm=TRUE) # divide cumsum(sar) by total SAR 
+sel_mean<-sel_mean[sel_mean$mean_16_21 > 0, ]# solo me quedo con los grids con valor 
+sel_mean$cumgrid <- cumsum(sel_mean[,"grid"])  # get the cumulative sar via function cumsum
+sel_mean$cumgrid2<- sel_mean$cumgrid / sum(sel_mean[,"grid"])
+# now estimate the proportion of the grid cells where 90% of the total swept area occurs
+sel_mean$ag90_mean <- ifelse(is.na(sel_mean$cum_mean2),NA,min(which (sel_mean$cum_mean2 > .9))/nrow(sel_mean))
+sel_mean$win_c90_mean<- ifelse(sel_mean[,"cum_mean2"] >sel_mean[,"ag90_mean"] ,0,1)# si la frec absolu es mayor que 0.9 
+
+
+grid_90<-merge(SARa, 
+               sel_mean, all.y=TRUE)
+
+st_write(grid_90, "C:/Users/User/Dropbox/0_IEO/Ciencia/Papers/VMEs_24_new/VME_paper_Ulla/Scripts/Scripts_cierres_Nora/Scripts_datos_Fishing/Outputs/2_Outputs_Core_Euros/SAR_core_90_95a.shp", 
+         delete_layer = TRUE)
+
+```
+
+#Recta regresión tendencia temporal x csq (Ulla)
+
+```{r}
+#centro de gravedad: #CENTRO DE GRAVEDAD######
+# otb####
+setwd("C:/Users/ulla.fernandez/Documents/EEMM_Antonio/ARTICULOS/WKTRADE3/Datos/NewAnalysis_Habitats2021_150322")
+otb<-read.csv(file = "grid005_tiempo-OTBPT_NA_depthFilt2_allyear.csv",header = T,dec=".",sep = ";")#
+gns<-read.csv(file ="grid005_tiempo-GNS_NA_depthFilt2_allyear.csv",header = T,dec=".",sep = ";")
+lls<-read.csv(file ="grid005_tiempo-LLS_NA_depthFilt2_allyear.csv",header = T,dec=".",sep = ";")
+head(otb)
+
+
+otb2<-mutate(otb,
+             goc = otb$effort*otb$depth)
+otb4 <- otb2 %>%
+  group_by(year) %>% summarize(
+    sum_goc = sum(goc),
+    sum_eff = sum(effort))
+otb4$gocz<-otb4$sum_goc/otb4$sum_eff
+otb4$gear<-"otb"
+
+write.table(otb4, "C:/Users/ulla.fernandez/Documents/EEMM_Antonio/ARTICULOS/WKTRADE3/Datos/NewAnalysis_Habitats2021_150322/Resultados/goc_otb.csv",sep=";",dec=".",row.names=F) 
+
+#gns####
+setwd("C:/Users/ulla.fernandez/Documents/EEMM_Antonio/ARTICULOS/WKTRADE3/Datos/NewAnalysis_Habitats2021_150322")
+gns<-read.csv(file ="grid005_tiempo-GNS_NA_depthFilt2_allyear.csv",header = T,dec=".",sep = ";")
+head(otb)
+
+gns2<-mutate(gns,
+             goc = gns$effort*gns$depth)
+
+gns4 <- gns2 %>%
+  group_by(year) %>% summarize(
+    sum_eff = sum(effort),
+    sum_goc = sum(goc))
+gns4$gocz<-gns4$sum_goc/gns4$sum_eff
+gns4$gear<-"gns"
+write.table(gns4, "C:/Users/ulla.fernandez/Documents/EEMM_Antonio/ARTICULOS/WKTRADE3/Datos/NewAnalysis_Habitats2021_150322/Resultados/goc_gns.csv",sep=";",dec=".",row.names=F) 
+# lls####
+
+setwd("C:/Users/ulla.fernandez/Documents/EEMM_Antonio/ARTICULOS/WKTRADE3/Datos/NewAnalysis_Habitats2021_150322")
+lls<-read.csv(file ="grid005_tiempo-LLS_NA_depthFilt2_allyear.csv",header = T,dec=".",sep = ";")
+
+lls2<-mutate(lls,
+             goc = lls$effort*lls$depth)
+
+lls4 <- lls2 %>%
+  group_by(year) %>% summarize(
+    sum_eff = sum(effort),
+    sum_goc = sum(goc))
+lls4$gocz<-lls4$sum_goc/lls4$sum_eff
+lls4$gear<-"lls"
+write.table(lls4, "C:/Users/ulla.fernandez/Documents/EEMM_Antonio/ARTICULOS/WKTRADE3/Datos/NewAnalysis_Habitats2021_150322/Resultados/goc_lls.csv",sep=";",dec=".",row.names=F) 
+#mirar resultados tb en scrip: Figures_manuscript
+#lo he hecho searado pq no sale la funcion...
+ind7 <- otb2 %>%
+  group_by(otb2$year) %>%
+  do({x = (sum(otb2$goc)/sum(otb2$effort))   #
+  data.frame(x)})
+
+#a?ado una nueva columna con goc para csq (xa?o)
+library(rgdal)
+library(dplyr) 
+
+# ## ## #glm# ## ## #
+
+glm1<-glm(gocz~year,data=otb2)
+summary(glm1)
+
+fitotb <- lm(gocz ~ year, data = otb2)
+summary(fitotb)
+fit <- lm(goc_no.fil ~ year, data = df)
+summary(fit)
+fit2 <- lm(goc ~ year, data = df2)
+summary(fit2)
+fit2 <- lm(goc_no.fil ~ year, data = df2)
+summary(fit2)
+
+df$year<-as.numeric(df$year)
+
+plot(goc ~ year, data = otb2)
+abline(fit)
+plot(fit)
+
+
+p0<-ggplot(df, aes(x = year, y = goc)) + 
+  geom_point() +
+  stat_smooth(method = "lm", col = "red")
+
+p1<-ggplot(df, aes(x = year, y = goc_no.fil)) + 
+  geom_point() +
+  stat_smooth(method = "lm", col = "red")
+
+
+p2<-ggplot(df2, aes(x = year, y = goc)) + 
+  geom_point() +
+  stat_smooth(method = "lm", col = "red")
+
+p3<-ggplot(df2, aes(x = year, y = goc_no.fil)) + 
+  geom_point() +
+  stat_smooth(method = "lm", col = "red")
+
+#p2 <- p2 + expand_limits(y = 0)
+print(p0)
+print(p1)
+
+print(p2)
+print(p3)
+#ma?ana sacar el valor por a?o y a?adirlo a una nueva matriz.
+
+
+
+#he cogido esta matriz y calculado el goc promedio en excel/datos/prueva/lls.goc. pq no me salen los scripts de abajo
+#2lls_grid005_GOC_09-20- las pivot table y resultados de glm
+#dbt2$year<-as.character(dbt2$year)
+
+#ind6 <- dbt2 %>%
+group_by(year) %>% summarize(
+  goc_mean = (sum(dbt2$goc)/sum(dbt2$hour)))#no me funciona...sale siempre el mismo valor..lo hago con tabla dinamica
+
+ind7 <- dbt2 %>%
+  group_by(year) %>% 
+  do({x = (sum(dbt2$goc)/sum(dbt2$hour))   # y, xcreate your function
+  data.frame(x)})
+
+
+
+
+unique(dbt2$year)
+
+```
+

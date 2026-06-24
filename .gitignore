@@ -1,0 +1,17 @@
+# Ignorar todo por defecto
+*
+
+# Excepciones: carpetas y archivos a incluir
+!.gitignore
+!README.md
+!HUMUS.Rproj
+
+!R/
+!R/**
+
+!code/
+!code/**
+
+!bib/
+!bib/**
+.Rproj.user
