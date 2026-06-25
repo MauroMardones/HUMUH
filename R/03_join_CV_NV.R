@@ -7,7 +7,7 @@ library(data.table)
 library(readxl)
 
 # CV_all debe estar en memoria desde 02_format_CV.R
-# o bien: CV_all <- fst::read_fst("outputs/CV_2017_2024_ZE_fmt.fst", as.data.table = TRUE)
+CV_all <- fst::read_fst("outputs/CV_2017_2024_ZE_fmt.fst", as.data.table = TRUE)
 
 # --- Ruta NV -----------------------------------------------------------------
 path_nv <- "data/Junta Andalucía/Notas de Venta_2018_2025/20251001 IEO NV 2018-2025"

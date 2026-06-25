@@ -1,6 +1,5 @@
 # Ignorar todo por defecto
 *
-
 # Excepciones: carpetas y archivos a incluir
 !.gitignore
 !README.md
