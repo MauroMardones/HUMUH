@@ -6,7 +6,7 @@
 
 library(data.table)
 library(tidyverse)
-library(fst)
+library(fst) 
 
 # --- Crear carpetas si no existen --------------------------------------------
 dir.create("outputs",      showWarnings = FALSE, recursive = TRUE)

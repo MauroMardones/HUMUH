@@ -13,7 +13,7 @@ library(geosphere)
 library(lubridate)
 
 # CV_all debe estar cargado desde 01_load_CV.R
-# o bien leer desde .fst: CV_all <- fst::read_fst("outputs/CV_2017_2024_ZE.fst", as.data.table = TRUE)
+# o bien leer desde .fst:  CV_all <- fst::read_fst("outputs/CV_2017_2024_ZE.fst", as.data.table = TRUE)
 
 # --- 1. Renombrar columna con caracteres especiales -------------------------
 en_puerto_col <- grep("PUERTO|puerto", names(CV_all), value = TRUE)

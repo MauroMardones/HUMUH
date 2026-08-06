@@ -47,7 +47,7 @@ tendencia <- fst::read_fst("outputs/tendencia_glm_2018_2024.fst",
                              as.data.table = TRUE)
 
 # =============================================================================
-# FUNCIÓN: celda 0.01° → polígono sf
+# FUNCIÓN: celda 0.05° → polígono sf
 # Recibe un data.table con lon_cel y lat_cel (centroides)
 # Devuelve un sf con geometría de polígonos cuadrados de 0.01°
 # =============================================================================
