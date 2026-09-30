@@ -288,4 +288,74 @@ p_linea <- ggplot(resumen_anual, aes(x = ANYO)) +
 ggsave("figs/core_fg_tendencia_anual.png", p_linea, width = 13, height = 9, dpi = 200)
 message("Guardado: core_fg_tendencia_anual.png")
 
+# =============================================================================
+# SOLAPAMIENTO ESPACIAL DE ARTES EN EL CORE FISHING GROUND
+# N° de artes cuyo core (acumulado 2018-2024) incluye cada celda
+# =============================================================================
+
+core_col <- "core_90"   # cambia a "core_75" si prefieres el core 75%
+
+overlap <- cfg[get(core_col) == 1,
+  .(n_artes = uniqueN(LE_MET4),
+    artes   = paste(sort(unique(LE_MET4)), collapse = "-")),
+  by = .(lon_cel, lat_cel, csq)]
+
+message("Celdas por n° de artes solapados:")
+print(overlap[, .N, by = n_artes][order(n_artes)])
+message("Combinaciones más frecuentes (celdas con >= 2 artes):")
+print(head(overlap[n_artes >= 2, .N, by = artes][order(-N)], 15))
+
+fst::write_fst(overlap, "outputs/overlap_core_fg_2018_2024.fst", compress = 75)
+
+# --- Capas del mapa (extensión mayor: incluye Estrecho y Málaga) -------------
+xlim_ov <- c(-8.2, -4.3)
+ylim_ov <- c(35.4, 37.6)
+
+bathy_ov <- marmap::getNOAA.bathy(lon1 = -8.5, lon2 = -4, lat1 = 35, lat2 = 38,
+                                  resolution = 1)
+bathy_ov <- marmap::fortify.bathy(bathy_ov)
+bathy_ov <- bathy_ov[bathy_ov$z <= 0, ]
+
+# Paleta: 1 arte = blanco; 2+ = amarillo → rojo
+n_max   <- max(overlap$n_artes)
+pal_ov  <- c("white",
+             grDevices::colorRampPalette(c("#f9e9b0", "#f3c67a", "#eca25e",
+                                           "#e3784c", "#c9483a"))(max(n_max - 1, 1)))
+names(pal_ov) <- as.character(seq_len(n_max))
+overlap[, n_artes_f := factor(n_artes, levels = seq_len(n_max))]
+lab_ov <- ifelse(seq_len(n_max) == 1, "1 gear", paste(seq_len(n_max), "gears"))
+
+p_overlap <- ggplot() +
+  geom_contour(data = bathy_ov, aes(x = x, y = y, z = z),
+               breaks = c(-25, -50, -200),
+               colour = "#8fb3d9", linewidth = 0.2) +
+  metR::geom_text_contour(data = bathy_ov, aes(x = x, y = y, z = z),
+                          breaks = c(-25, -50, -200),
+                          colour = "#2c6aa8", size = 2.2, skip = 1,
+                          rotate = FALSE, stroke = 0) +
+  geom_tile(data = overlap,
+            aes(x = lon_cel, y = lat_cel, fill = n_artes_f)) +
+  geom_sf(data = costa_fill, fill = "white", colour = NA) +
+  geom_sf(data = costa_line, colour = "grey40", linewidth = 0.1) +
+  scale_fill_manual(values = pal_ov, labels = lab_ov, drop = FALSE,
+                    name = "Gears in core overlapping") +
+  coord_sf(xlim = xlim_ov, ylim = ylim_ov, expand = FALSE) +
+  xlab(expression(paste(Longitude^o, ~"O"))) +
+  ylab(expression(paste(Latitude^o, ~"N"))) +
+  labs(title = "Spatial overlap of fishing gears") +
+  theme_few() +
+  theme(
+    plot.title       = element_text(face = "bold", size = 13),
+    legend.position  = "right",
+    legend.title     = element_text(face = "bold", size = 10),
+    legend.text      = element_text(size = 10),
+    legend.key       = element_rect(colour = NA),
+    panel.background = element_rect(fill = "#eaf2fa", colour = NA)
+  )
+
+print(p_overlap)
+ggsave("figs/overlap_gear.png", p_overlap, width = 10, height = 6.5, dpi = 300,
+       bg = "white")
+message("Guardado: figs/overlap_gear.png")
+
 message("Script 06 completado.")

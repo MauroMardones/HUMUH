@@ -17,7 +17,7 @@ p99 <- dat[, .(p99 = quantile(SI_SPCA, 0.99, na.rm = TRUE)), by = LE_MET4]
 dat <- dat[p99, on = "LE_MET4"][SI_SPCA <= p99]
 
 ggplot(dat, aes(x = SI_SPCA)) +
-  geom_histogram(bins = 80, fill = "steelblue", color = "white", alpha = 0.8) +
+  geom_histogram(bins = 80, fill = "steelblue", color = "white") +
   geom_vline(data = umbrales, aes(xintercept = lo), color = "red",     linetype = "dashed", linewidth = 0.7) +
   geom_vline(data = umbrales, aes(xintercept = hi), color = "darkred", linetype = "dashed", linewidth = 0.7) +
   facet_wrap(~ LE_MET4, scales = "free", ncol = 3) +

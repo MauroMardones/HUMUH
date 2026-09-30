@@ -181,7 +181,7 @@ p_prof <- ggplot(cog, aes(x = ANYO, y = COG_prof, colour = arte_label)) +
   scale_colour_viridis_d(option = "turbo") +
   scale_x_continuous(breaks = sort(unique(cog$ANYO))) +
   scale_y_reverse() +    # profundidad mayor hacia abajo
-  facet_wrap(~ arte_label, ncol = 3, scales = "free_y") +
+  facet_wrap(~ arte_label, ncol = 3) +
   xlab("Año") +
   ylab("Profundidad COG (m)") +
   labs(
