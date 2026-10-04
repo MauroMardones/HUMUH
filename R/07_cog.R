@@ -207,36 +207,79 @@ if (!exists("bathy_df")) {
   bathy_df  <- bathy_df[bathy_df$z <= 0, ]
 }
 
-p_traj <- ggplot() +
-  geom_contour(
-    data = bathy_df, aes(x = x, y = y, z = z),
-    breaks = c(-25, -50, -200),
-    colour = "#005b96", linewidth = 0.2, alpha = 0.4
-  ) +
-  geom_sf(data = costa_fill, fill = "white", colour = NA) +
-  geom_sf(data = costa_line, colour = "grey40", linewidth = 0.1) +
-  geom_point(data = cog,
-             aes(x = COG_lon, y = COG_lat,
-                 colour = arte_label, size = horas_total),
-             alpha = 0.8) +
-  geom_text(data = cog,
-            aes(x = COG_lon, y = COG_lat, label = ANYO),
-            size = 2.5, vjust = -0.8, colour = "grey20") +
-  scale_colour_viridis_d(option = "turbo", name = "Arte") +
-  scale_size_continuous(name = "Horas totales", range = c(1, 5)) +
-  coord_sf(xlim = c(-9, -5), ylim = c(35.5, 37.5)) +
-  facet_wrap(~ arte_label, ncol = 5) +
-  xlab(expression(paste(Longitud^o, ~"O"))) +
-  ylab(expression(paste(Latitud^o,  ~"N"))) +
-  labs(title = "Centro de gravedad del esfuerzo 2018-2024") +
-  theme_few() +
-  theme(
-    strip.text       = element_text(size = 9, face = "bold"),
-    legend.position  = "bottom",
-    panel.background = element_rect(fill = "#eaf4fb", colour = NA)
-  )
+# Un panel por arte, cada uno con su propio zoom alrededor de su COG:
+# con una extensión común los puntos quedan colapsados (el COG se mueve < 10 km).
+# Trayectoria unida por años con flecha, color = año, solo se rotulan año inicial y final.
+library(patchwork)
+library(ggrepel)
 
-ggsave("figs/cog_trayectoria.png", p_traj, width = 13, height = 12, dpi = 200)
+cog <- cog[order(LE_MET4, ANYO)]
+anio_ini <- min(cog$ANYO); anio_fin <- max(cog$ANYO)
+artes_cog <- intersect(names(artes_label), unique(cog$LE_MET4))
+
+# Mismo marco para todos los paneles: ventana cuadrada del mismo tamaño
+# (misma escala), centrada en la trayectoria de cada arte
+pad <- 0.05
+half <- max(cog[, .(h = max(diff(range(COG_lon)), diff(range(COG_lat))) / 2),
+                by = LE_MET4]$h) + pad
+
+artes_label_en <- c(
+  DRB = "DRB (Dredge)",               HMD = "HMD (Hydraulic dredge)",
+  FPO = "FPO (Pots & traps)",         GN  = "GN (Gillnet)",
+  GNS = "GNS (Set gillnet)",          GTN = "GTN (Gillnet-trammel)",
+  GTR = "GTR (Trammel net)",          LL  = "LL (Longline)",
+  LLS = "LLS (Set longline)",         LHP = "LHP (Hand line)"
+)
+
+panel_cog <- function(art) {
+  d   <- cog[LE_MET4 == art][order(ANYO)]
+  ext <- d[ANYO %in% range(ANYO)]                       # año inicial y final
+  cx  <- mean(range(d$COG_lon)); cy <- mean(range(d$COG_lat))
+  hw  <- half / cos(cy * pi / 180)                      # cuadrado en km (corrige lon)
+  hh  <- half
+
+  ggplot() +
+    geom_contour(data = bathy_df, aes(x = x, y = y, z = z),
+                 breaks = c(-25, -50, -200),
+                 colour = "#005b96", linewidth = 0.2, alpha = 0.4) +
+    geom_sf(data = costa_fill, fill = "white", colour = NA) +
+    geom_sf(data = costa_line, colour = "grey40", linewidth = 0.1) +
+    geom_path(data = d, aes(x = COG_lon, y = COG_lat),
+              colour = "grey45", linewidth = 0.4,
+              arrow = arrow(length = unit(2, "mm"), type = "closed")) +
+    geom_point(data = d, aes(x = COG_lon, y = COG_lat,
+                             fill = ANYO, size = horas_total),
+               shape = 21, colour = "grey25", stroke = 0.3) +
+    geom_label_repel(data = ext, aes(x = COG_lon, y = COG_lat, label = ANYO),
+                     size = 2.8, label.padding = 0.12, box.padding = 0.5,
+                     min.segment.length = 0, segment.colour = "grey40",
+                     seed = 1) +
+    scale_fill_viridis_c(option = "D", name = "Year",
+                         limits = c(anio_ini, anio_fin),
+                         breaks = c(anio_ini, anio_fin)) +
+    scale_size_continuous(name = "Total fishing hours", range = c(1.5, 6),
+                          limits = range(cog$horas_total)) +
+    scale_x_continuous(n.breaks = 3) +
+    scale_y_continuous(n.breaks = 3) +
+    coord_sf(xlim = cx + c(-hw, hw), ylim = cy + c(-hh, hh), expand = FALSE) +
+    labs(title = artes_label_en[art], x = NULL, y = NULL) +
+    theme_few() +
+    theme(
+      plot.title       = element_text(size = 10, face = "bold"),
+      axis.text        = element_text(size = 6),
+      panel.background = element_rect(fill = "#eaf4fb", colour = NA)
+    )
+}
+
+p_traj <- wrap_plots(lapply(artes_cog, panel_cog), ncol = 4) +
+  plot_layout(guides = "collect") +
+  plot_annotation(title = paste0("Centre of gravity of fishing effort ",
+                                 anio_ini, "–", anio_fin)) &
+  theme(legend.position = "none")
+
+print(p_traj)
+ggsave("figs/cog_trayectoria.png", p_traj, width = 14, height = 11, dpi = 200,
+       bg = "white")
 message("Guardado: cog_trayectoria.png")
 
 message("Script 07 completado.")

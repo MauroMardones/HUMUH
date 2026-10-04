@@ -15,6 +15,7 @@ library(sf)
 library(rnaturalearth)
 library(rnaturalearthhires)
 library(marmap)
+library(patchwork)
 
 # --- 1. Leer solo las columnas necesarias -------------------------------------
 cols <- c("VE_REF", "ANYO", "SI_TIMESTAMP", "SI_LATI", "SI_LONG", "SI_SPCA", "LE_MET4")
@@ -69,6 +70,7 @@ pts <- pts[!is.na(arte)]
 # --- 6. Costa y batimetría ---------------------------------------------------
 sf::sf_use_s2(FALSE)
 costa <- ne_countries(scale = "large", returnclass = "sf")
+costa_full <- costa
 costa <- st_crop(costa, xmin = -9, xmax = -4, ymin = 33, ymax = 39)
 sf::sf_use_s2(TRUE)
 
@@ -76,8 +78,8 @@ bathy <- getNOAA.bathy(lon1 = -8, lon2 = -5, lat1 = 35, lat2 = 38, resolution = 
 bathy_df <- fortify.bathy(bathy)
 bathy_df <- bathy_df[bathy_df$z <= 0, ]
 
-xlim <- c(-7.6, -5.5)   # ajusta si hay puntos fuera
-ylim <- c(35.9, 37.3)
+xlim <- c(-7.9, -5.2)   # algo más amplio que antes
+ylim <- c(35.7, 37.45)
 
 # --- 7. Mapa único con puntos superpuestos -----------------------------------
 pts <- pts[sample(.N)]   # orden aleatorio: ningún arte tapa sistemáticamente a otro
@@ -92,13 +94,32 @@ p <- ggplot() +
   geom_sf(data = costa, fill = "grey90", colour = "grey40", linewidth = 0.1) +
   coord_sf(xlim = xlim, ylim = ylim) +
   scale_fill_viridis_d(option = "turbo", name = "Fishery (LE_MET4)") +
-  guides(fill = guide_legend(override.aes = list(size = 4, alpha = 1), ncol = 1)) +
+  guides(fill = guide_legend(override.aes = list(size = 6, alpha = 1), ncol = 1)) +
   labs(x = NULL, y = NULL) +
   theme_few() +
   theme(legend.position  = "right",
-        legend.title     = element_text(face = "bold", size = 10),
-        legend.text      = element_text(size = 9),
+        legend.title     = element_text(face = "bold", size = 15),
+        legend.text      = element_text(size = 13),
+        legend.key.size  = unit(0.9, "cm"),
+        axis.text        = element_text(size = 11),
         panel.background = element_rect(fill = "#eaf4fb", colour = NA))
+
+# --- 7b. Mapa de ubicación (inset) -------------------------------------------
+sf::sf_use_s2(FALSE)
+iberia <- st_crop(costa_full, xmin = -12, xmax = 5, ymin = 33, ymax = 45)
+sf::sf_use_s2(TRUE)
+caja <- st_as_sfc(st_bbox(c(xmin = xlim[1], xmax = xlim[2],
+                            ymin = ylim[1], ymax = ylim[2]), crs = 4326))
+p_loc <- ggplot() +
+  geom_sf(data = iberia, fill = "grey80", colour = "grey50", linewidth = 0.1) +
+  geom_sf(data = caja, fill = NA, colour = "#c0392b", linewidth = 0.9) +
+  coord_sf(xlim = c(-10.5, 4), ylim = c(34.5, 44.5), expand = FALSE) +
+  theme_void() +
+  theme(panel.background = element_rect(fill = "#eaf4fb", colour = "grey40", linewidth = 0.5))
+
+# esquina inferior izquierda (mar abierto)
+p <- p + inset_element(p_loc, left = 0.01, bottom = 0.01, right = 0.27, top = 0.33,
+                       align_to = "panel")
 
 print(p)
 
